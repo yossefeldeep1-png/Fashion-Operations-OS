@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS product.sku (
+    id UUID PRIMARY KEY,
+    code VARCHAR(100) UNIQUE NOT NULL,
+    style_id UUID NOT NULL,
+    color_id UUID NOT NULL,
+    size_id UUID NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMP NULL
+);
