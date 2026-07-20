@@ -1,0 +1,22 @@
+-- V002__create_schemas.sql
+-- Create bounded context schemas
+
+CREATE SCHEMA IF NOT EXISTS product;
+
+CREATE SCHEMA IF NOT EXISTS purchasing;
+
+CREATE SCHEMA IF NOT EXISTS inbound;
+
+CREATE SCHEMA IF NOT EXISTS inventory;
+
+CREATE SCHEMA IF NOT EXISTS quality;
+
+CREATE SCHEMA IF NOT EXISTS fulfillment;
+
+CREATE SCHEMA IF NOT EXISTS reverse;
+
+CREATE SCHEMA IF NOT EXISTS control;
+
+CREATE SCHEMA IF NOT EXISTS admin;
+
+CREATE SCHEMA IF NOT EXISTS platform;
