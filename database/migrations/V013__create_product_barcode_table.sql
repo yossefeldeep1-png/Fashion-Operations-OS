@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS product.barcode (
+    id UUID PRIMARY KEY,
+    sku_id UUID NOT NULL,
+    barcode_value VARCHAR(100) UNIQUE NOT NULL,
+    barcode_type VARCHAR(50) NOT NULL DEFAULT 'INTERNAL',
+    is_primary BOOLEAN NOT NULL DEFAULT TRUE,
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMP NULL
+);
