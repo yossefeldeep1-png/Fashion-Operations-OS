@@ -1,0 +1,18 @@
+@import "./styles/fonts.css";
+@import "tailwindcss";
+@import "./styles/theme.css";
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Source Sans 3", Arial, sans-serif;
+  }
+  button, input { font: inherit; }
+}
+
+@layer utilities {
+  .font-slab { font-family: "Roboto Slab", Georgia, serif; }
+  .font-mono { font-family: "DM Mono", monospace; }
+  .scrollbar-hidden::-webkit-scrollbar { display: none; }
+  .scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+}
