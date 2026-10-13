@@ -663,7 +663,7 @@ function InboundApp({ live }: { live: LiveData }) {
             activity={activity} audit={audit} options={options} optionsError={optionsError}
             onAddedLine={async () => { await reloadOperationalData(); setDetailNonce((n) => n + 1); }}
             onClose={() => setSelected(null)}
-            onAction={readOnlyMsg}
+            onAction={() => setNotice("This action is not connected to a validated backend operation yet; no database change was made.")}
             putawayTasks={putawayTasks} />
         )}
 
@@ -1714,8 +1714,8 @@ function ReceivingTab(props: {
             <div className="border-t border-border pt-2">
               <p className="font-mono text-[8px] uppercase tracking-[0.1em] text-muted-foreground mb-1">Live job inactivity</p>
               <div className="flex items-end gap-0.5 h-6">
-                {jobs.slice().sort((a, b) => b.ageMinutes - a.ageMinutes).slice(0, 12).map((job) => <span key={job.id} title={`${job.jobNumber ?? job.id} · no update for ${job.age}`} className={`flex-1 rounded-sm ${job.ageMinutes > 240 ? "bg-amber-400" : "bg-[#7ab09f]"}`} style={{ height: `${Math.max(3, Math.min(24, (job.ageMinutes / 240) * 24))}px` }} />)}
-                {!jobs.length && <span className="text-[9px] text-muted-foreground">No jobs</span>}
+                {props.jobs.slice().sort((a, b) => b.ageMinutes - a.ageMinutes).slice(0, 12).map((job) => <span key={job.id} title={`${job.jobNumber ?? job.id} · no update for ${job.age}`} className={`flex-1 rounded-sm ${job.ageMinutes > 240 ? "bg-amber-400" : "bg-[#7ab09f]"}`} style={{ height: `${Math.max(3, Math.min(24, (job.ageMinutes / 240) * 24))}px` }} />)}
+                {!props.jobs.length && <span className="text-[9px] text-muted-foreground">No jobs</span>}
               </div>
               <p className="mt-1 text-[9px] text-muted-foreground">Each bar = one live job · amber = no update &gt;4h. Bars visualize inactivity only; no SLA metric is configured.</p>
             </div>
@@ -1973,13 +1973,13 @@ function ExceptionsTab({ jobs, tasks, onSelectJob, onNavigate }: {
   const blockedTasks = tasks.filter((t) => t.status === "blocked");
   const total = exceptions.length + blockedTasks.length;
 
-  const exceptionGroups: { label: string; jobs: Job[]; color: string; tab: InboundTab }[] = [
+  const exceptionGroups = ([
     { label: "Validation Failures", jobs: exceptions.filter((j) => j.issue === "Validation" || j.status === "validation_failed"), color: "red", tab: "Validation" },
     { label: "QC Issues", jobs: exceptions.filter((j) => j.issue === "QC"), color: "rose", tab: "QC" },
     { label: "Aging >4h (app rule)", jobs: exceptions.filter((j) => j.issue === "Aging"), color: "amber", tab: "Putaway" },
     { label: "Variance", jobs: exceptions.filter((j) => j.issue === "Variance"), color: "orange", tab: "Receiving" },
     { label: "Blocked / Unassigned", jobs: exceptions.filter((j) => j.issue === "Blocked"), color: "amber", tab: "Receiving" },
-  ].filter((g) => g.jobs.length > 0);
+  ] as { label: string; jobs: Job[]; color: string; tab: InboundTab }[]).filter((g) => g.jobs.length > 0);
 
   return (
     <div className="h-full overflow-y-auto scrollbar-hidden p-4 space-y-4">
