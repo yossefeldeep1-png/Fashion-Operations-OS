@@ -59,6 +59,7 @@ export type LivePutawayTask = {
   priority: "normal" | "high" | "urgent";
   ageMinutes: number;
   warehouse: string;
+  lotId?: string | null;
 };
 
 export type OperationalReadiness = {
@@ -321,8 +322,9 @@ export function mapDashboard(raw: unknown): LiveJob[] {
     if (typeof id !== "string" || typeof statusRaw !== "string") {
       throw new ShapeError("Dashboard row is missing its stable ID or status", `Row ${i} keys: ${keysOf(o)}`);
     }
-    const status = statusRaw.toLowerCase() === "draft" ? "waiting_truck" : statusRaw.toLowerCase();
-    if (!STATUSES.has(status)) throw new ShapeError("Unknown inbound job status", `Row ${i}: ${statusRaw}`);
+    const statusText = statusRaw.toLowerCase() === "draft" ? "waiting_truck" : statusRaw.toLowerCase();
+    if (!STATUSES.has(statusText as LiveStatus)) throw new ShapeError("Unknown inbound job status", `Row ${i}: ${statusRaw}`);
+    const status = statusText as LiveStatus;
     const min = Math.max(0, numeric(ageMinutes));
     const updatedText = typeof updated === "string" ? updated : (typeof createdAt === "string" ? createdAt : "—");
     const jobNo = typeof jobNumber === "string" && jobNumber ? jobNumber : id;
