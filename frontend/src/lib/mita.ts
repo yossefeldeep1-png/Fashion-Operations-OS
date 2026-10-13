@@ -34,6 +34,7 @@ export type LiveLine = {
   expected: number;
   received: number;
   barcode?: string | null;
+  lineStatus?: string | null;
   qcChecked: boolean;
   qcPass: number;
   qcFail: number;
@@ -203,6 +204,21 @@ export const addReceiptLine = (input: AddReceiptLineInput) => {
     p_manual_reason: input.manualReason ?? null, p_idempotency_key: idempotencyKey,
   }]);
 };
+
+export type ReidentifyReceiptLineInput = {
+  receiptLineId: string;
+  skuId: string;
+  barcodeValue?: string | null;
+  manualReason?: string | null;
+  idempotencyKey?: string;
+};
+export const reidentifyReceiptLine = (input: ReidentifyReceiptLineInput) => rpcTry("mita_reidentify_receipt_line", [{
+  p_receipt_line_id: input.receiptLineId,
+  p_sku_id: input.skuId,
+  p_barcode_value: input.barcodeValue ?? null,
+  p_manual_reason: input.manualReason ?? null,
+  p_idempotency_key: input.idempotencyKey ?? newIdempotencyKey("reidentify-receipt-line"),
+}]);
 
 type ReceiptNote = { id: string; receiptId: string; note: string; createdAt: string; actor: string };
 type ReceiptDocument = { id: string; receiptId: string; objectPath: string; fileName: string; contentType: string; sizeBytes: number; note?: string | null; createdAt: string; uploadedBy: string };
@@ -392,6 +408,7 @@ export function mapReceiptLines(raw: unknown): LiveLine[] | null {
       expected: e,
       received: a,
       barcode: typeof pick(o, "barcode", "barcodeValue", "barcode_value") === "string" ? String(pick(o, "barcode", "barcodeValue", "barcode_value")) : null,
+      lineStatus: typeof pick(o, "lineStatus", "line_status") === "string" ? String(pick(o, "lineStatus", "line_status")) : null,
       qcChecked,
       qcPass: numeric(pick(qc ?? {}, "passQty", "qtyPass", "qty_pass")),
       qcFail: numeric(pick(qc ?? {}, "failQty", "qtyFail", "qty_fail")),

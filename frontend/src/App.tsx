@@ -7,6 +7,7 @@ import {
   createReceipt,
   confirmReceipt,
   recordQC,
+  reidentifyReceiptLine,
   uploadQcEvidence,
   removeQcEvidence,
   getInboundDashboard,
@@ -2580,6 +2581,7 @@ function DrawerReceiptLines({ job, lines, options, optionsError, onAddedLine }: 
             <span className="w-14 px-2 text-right font-mono text-[10px] text-[#4a5550]">{line.expected}</span>
             <span className="w-14 px-2 text-right font-mono text-[10px] font-medium text-[#1b2e28]">{line.received}</span>
             <span className={`w-10 px-2 text-right font-mono text-[10px] font-bold ${diff !== 0 ? "text-amber-700" : "text-muted-foreground"}`}>{diff > 0 ? "+" : ""}{diff !== 0 ? diff : "—"}</span>
+            {job.receiptId && line.id && line.skuId && !line.qcChecked && ["receiving", "identifying", "counting"].includes(job.status) && <div className="col-span-5 mt-2"><ReidentifyReceiptLineForm job={job} line={line} options={options} onDone={onAddedLine} /></div>}
             {job.receiptId && line.id && line.received > 0 && !line.qcChecked && ["identifying", "counting", "qc_in_progress"].includes(job.status) && <div className="col-span-5 mt-2"><ReceiptLineQCForm job={job} line={line} onDone={onAddedLine} /></div>}
           </div>;
         })}
@@ -2596,6 +2598,87 @@ function DrawerReceiptLines({ job, lines, options, optionsError, onAddedLine }: 
         <button onClick={() => { void handleConfirm(); }} disabled={!canConfirm} className="w-full rounded border border-[#24564e] bg-[#24564e] px-3 py-2 text-[10px] font-bold text-white hover:bg-[#183f39] disabled:cursor-not-allowed disabled:opacity-50">{confirmBusy ? "Confirming in database…" : "Confirm Receipt"}</button>
       </div>}
     </>
+  );
+}
+
+function ReidentifyReceiptLineForm({ job, line, options, onDone }: {
+  job: Job; line: LiveLine; options: InboundOptions; onDone: () => Promise<void>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [skuId, setSkuId] = useState(line.skuId ?? "");
+  const initialSku = options.skus.find((sku) => sku.id === (line.skuId ?? ""));
+  const [barcodeValue, setBarcodeValue] = useState(line.barcode ?? initialSku?.barcodes.find((b) => b.primary)?.value ?? "");
+  const [manualReason, setManualReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [key, setKey] = useState(() => newIdempotencyKey("reidentify-receipt-line"));
+  const sku = options.skus.find((item) => item.id === skuId);
+  const field = "w-full rounded border border-border bg-white px-2 py-1.5 text-[10px] outline-none focus:border-[#24564e] disabled:opacity-60";
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    if (!job.receiptId || !line.id) return setError("The receipt or receipt-line ID is missing; correction is blocked.");
+    if (!sku) return setError("Select an active target SKU from the live product catalog.");
+    if (!barcodeValue.trim() && manualReason.trim().length < 5) {
+      return setError("Enter a barcode that matches the target SKU, or provide a manual identification reason of at least 5 characters.");
+    }
+    setBusy(true);
+    try {
+      await reidentifyReceiptLine({
+        receiptLineId: line.id,
+        skuId: sku.id,
+        barcodeValue: barcodeValue.trim() || null,
+        manualReason: manualReason.trim() || null,
+        idempotencyKey: key,
+      });
+      setSuccess(`SKU corrected to ${sku.skuCode}. The change was saved and audited by Supabase.`);
+      setKey(newIdempotencyKey("reidentify-receipt-line"));
+      await onDone();
+    } catch (e2) {
+      setError(e2 instanceof Error ? e2.message : String(e2));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded border border-border bg-white p-2">
+      <button type="button" onClick={() => { setExpanded((v) => !v); setError(""); setSuccess(""); }}
+        disabled={busy || options.skus.length === 0}
+        className="rounded border border-[#24564e] px-2 py-1 text-[9px] font-bold text-[#24564e] hover:bg-[#edf5f0] disabled:cursor-not-allowed disabled:opacity-40">
+        {expanded ? "Cancel SKU correction" : "Correct SKU / barcode"}
+      </button>
+      {options.skus.length === 0 && <p className="mt-1 text-[9px] text-amber-800">No active target SKU is available in the live catalog.</p>}
+      {expanded && <form onSubmit={(e) => { void submit(e); }} className="mt-2 space-y-2">
+        <p className="text-[9px] text-muted-foreground">Current line: <span className="font-mono font-semibold">{line.sku}</span>. Supabase validates the target SKU, PO consistency, barcode or manual override permission, and workflow state before changing it.</p>
+        <label className="block text-[9px] font-semibold text-[#35443f]">Target active SKU
+          <select value={skuId} onChange={(e) => {
+            const nextId = e.target.value;
+            setSkuId(nextId);
+            const nextSku = options.skus.find((item) => item.id === nextId);
+            setBarcodeValue(nextSku?.barcodes.find((b) => b.primary)?.value ?? "");
+          }} className={`mt-1 ${field}`} disabled={busy}>
+            <option value="">Choose target SKU</option>
+            {!options.skus.some((item) => item.id === line.skuId) && line.skuId && <option value={line.skuId}>Current SKU (not active in catalog) · {line.sku}</option>}
+            {options.skus.map((item) => <option value={item.id} key={item.id}>{item.skuCode}</option>)}
+          </select>
+        </label>
+        <label className="block text-[9px] font-semibold text-[#35443f]">Barcode (must resolve to target SKU)
+          <input value={barcodeValue} onChange={(e) => setBarcodeValue(e.target.value)} placeholder={sku?.barcodes.find((b) => b.primary)?.value ?? "Scan/enter barcode"} className={`mt-1 font-mono ${field}`} disabled={busy} />
+        </label>
+        <label className="block text-[9px] font-semibold text-[#35443f]">Manual identification reason (required without barcode)
+          <input value={manualReason} onChange={(e) => setManualReason(e.target.value)} placeholder="Explain how the SKU was verified" className={`mt-1 ${field}`} disabled={busy || !!barcodeValue.trim()} />
+        </label>
+        {error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-[9px] text-red-800">{error}</p>}
+        {success && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 p-2 text-[9px] text-emerald-800">{success}</p>}
+        <button disabled={busy || !skuId} className="w-full rounded border border-[#24564e] bg-[#24564e] px-3 py-1.5 text-[10px] font-bold text-white hover:bg-[#183f39] disabled:opacity-50">
+          {busy ? "Validating and saving…" : "Save SKU correction"}
+        </button>
+      </form>}
+    </div>
   );
 }
 
