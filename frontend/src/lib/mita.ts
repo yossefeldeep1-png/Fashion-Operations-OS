@@ -424,6 +424,7 @@ export function mapPutawayTasks(raw: unknown): LivePutawayTask[] {
       suggestedBin: String(pick(o, "suggestedBin", "suggested_bin") ?? "—"),
       actualBinId: typeof pick(o, "actualBinId", "actual_bin_id") === "string" ? String(pick(o, "actualBinId", "actual_bin_id")) : null,
       actualBin: String(pick(o, "actualBin", "actual_bin") ?? "—"),
+      lotId: typeof pick(o, "lotId", "lot_id") === "string" ? String(pick(o, "lotId", "lot_id")) : null,
       worker: String(pick(o, "assignedTo", "assigned_to", "worker") ?? "Unassigned"),
       status,
       priority: priorityValue >= 2 ? "urgent" : priorityValue === 1 ? "high" : "normal",
