@@ -205,13 +205,11 @@ export const addReceiptLine = (input: AddReceiptLineInput) => {
 
 type ReceiptNote = { id: string; receiptId: string; note: string; createdAt: string; actor: string };
 type ReceiptDocument = { id: string; receiptId: string; objectPath: string; fileName: string; contentType: string; sizeBytes: number; note?: string | null; createdAt: string; uploadedBy: string };
-
 function objectRows<T>(raw: unknown, key: string): T[] {
   if (Array.isArray(raw)) return raw as T[];
   if (raw && typeof raw === "object") { const v = (raw as Record<string, unknown>)[key]; if (Array.isArray(v)) return v as T[]; }
   return [];
 }
-
 export async function getReceiptNotes(receiptId: string, limit = 100): Promise<ReceiptNote[]> {
   return objectRows<ReceiptNote>(await rpcTry("mita_get_receipt_notes", [{ p_receipt_id: receiptId, p_limit: limit }]), "notes");
 }
@@ -229,15 +227,23 @@ export async function uploadReceiptDocument(receiptId: string, file: File, note 
   const ext = DOCUMENT_TYPES[file.type];
   if (!ext) throw new Error("Documents must be PDF, JPEG, PNG, or WebP.");
   if (file.size < 1 || file.size > 10 * 1024 * 1024) throw new Error("The document must be smaller than 10 MB.");
-  const filename = String(Date.now()) + "-" + safeFilePart(file.name.replace(/\\.[^.]+$/, "")) + "." + ext;
+  const filename = String(Date.now()) + "-" + safeFilePart(file.name.replace(/\.[^.]+$/, "")) + "." + ext;
   const objectPath = receiptId + "/" + user.id + "/" + filename;
   const { error: uploadError } = await supabase.storage.from("mita-receipt-documents").upload(objectPath, file, { contentType: file.type, upsert: false });
   if (uploadError) throw new Error("Document upload failed: " + uploadError.message);
   try {
-    const raw = await rpcTry("mita_register_receipt_document", [{ p_receipt_id: receiptId, p_object_path: objectPath, p_file_name: file.name.slice(0, 255), p_content_type: file.type, p_size_bytes: file.size, p_note: note.trim() || null, p_idempotency_key: idempotencyKey }]);
+    const raw = await rpcTry("mita_register_receipt_document", [{
+      p_receipt_id: receiptId, p_object_path: objectPath, p_file_name: file.name.slice(0, 255),
+      p_content_type: file.type, p_size_bytes: file.size, p_note: note.trim() || null,
+      p_idempotency_key: idempotencyKey,
+    }]);
     return raw as ReceiptDocument;
   } catch (error) {
-    try { const match = (await getReceiptDocuments(receiptId)).find((d) => d.objectPath === objectPath); if (match) return match; await supabase.storage.from("mita-receipt-documents").remove([objectPath]); } catch { /* avoid deleting a possibly referenced object */ }
+    try {
+      const match = (await getReceiptDocuments(receiptId)).find((doc) => doc.objectPath === objectPath);
+      if (match) return match;
+      await supabase.storage.from("mita-receipt-documents").remove([objectPath]);
+    } catch { /* keep the object if commit status cannot be established */ }
     throw error;
   }
 }
@@ -247,7 +253,6 @@ export async function downloadReceiptDocument(objectPath: string): Promise<Blob>
   if (!data) throw new Error("The private document store returned no file data.");
   return data;
 }
-
 
 export async function getInboundOptionsTyped(warehouseId?: string | null): Promise<InboundOptions> {
   const raw = await getInboundOptions(warehouseId);
